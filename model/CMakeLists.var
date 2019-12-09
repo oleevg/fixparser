@@ -1,0 +1,39 @@
+##############################################
+#
+# CMake project build suite v1.0.0
+# Author: Oleg F., fedorov.ftf@gmail.com
+#
+##############################################
+
+set(module_name model)
+
+set(module_type library)
+
+set(library_type)
+
+set(headers
+    include/model/TagValue.hpp
+    include/model/FixFieldTag.hpp
+    include/model/FixBaseHeader.hpp
+    include/model/FixBaseMessage.hpp
+    )
+
+set(sources
+    src/FixBaseHeader.cpp
+    src/FixBaseMessage.cpp
+    )
+
+set(tests
+    )
+
+set(definitions
+    )
+
+set(libraries
+    )
+
+set(external_libraries
+    )
+
+set(libraries_test
+    )

@@ -1,0 +1,43 @@
+##############################################
+#
+# CMake project build suite v1.0.0
+# Author: Oleg F., fedorov.ftf@gmail.com
+#
+##############################################
+
+set(module_name core)
+
+set(module_type library)
+
+set(library_type)
+
+set(headers
+    include/core/BaseException.hpp
+    include/core/ProtocolParser.hpp
+    ../model/include/model/FixHelper.hpp
+    )
+
+set(sources
+    src/ProtocolParser.cpp
+    ../model/src/FixHelper.cpp
+    )
+
+set(tests
+    test/ProtocolParser_test.cpp
+    )
+
+set(definitions
+    )
+
+set(libraries
+    fixparser_model
+    )
+
+set(external_libraries
+    )
+
+set(libraries_test
+    fixparser_core
+    ${GTEST_LIBRARIES}
+    ${Log4cxx_LIBRARIES}
+    )
