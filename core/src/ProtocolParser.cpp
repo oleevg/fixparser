@@ -16,11 +16,10 @@
 #include <model/FixBaseHeader.hpp>
 #include <model/FixBaseMessage.hpp>
 #include <model/FixFieldTag.hpp>
-
 #include <model/FixHelper.hpp>
-#include <core/ProtocolParser.hpp>
-
 #include <model/TagValue.hpp>
+
+#include <core/ProtocolParser.hpp>
 
 namespace fixparser {
 namespace core {
@@ -30,7 +29,7 @@ namespace core {
     ProtocolParserImpl(std::istream& inputStream, char tagValueDelimiter, char fieldsDelimiter):
             inputStream_(inputStream), tagValueDelimiter_(tagValueDelimiter), fieldsDelimiter_(fieldsDelimiter)
     {
-      logger_ = log4cxx::Logger::getLogger("fixparser.parser");
+      logger_ = log4cxx::Logger::getLogger("fixparser.core.ProtocolParser");
     }
 
     void readField(char* buffer, size_t size, model::ByteArray& byteArray)
@@ -86,6 +85,7 @@ namespace core {
         char tagBuffer[24];
         model::ByteArray value;
 
+        // model::FixFieldTag::BeginString processing
         stateMachine.readField(tagBuffer, sizeof(tagBuffer), value);
         if(model::FixHelper::testTag(tagBuffer, model::FixFieldTag::BeginString))
         {
@@ -93,10 +93,11 @@ namespace core {
         }
         else
         {
-          LOG4CXX_ERROR(stateMachine.logger_, "FixFieldTag::BeginString is not found.");
+          LOG4CXX_ERROR(stateMachine.logger_, "FixFieldTag::BeginString is not the first statement.");
           return;
         }
 
+        // model::FixFieldTag::BodyLength processing
         stateMachine.readField(tagBuffer, sizeof(tagBuffer), value);
         if (model::FixHelper::testTag(tagBuffer, model::FixFieldTag::BodyLength))
         {
@@ -108,6 +109,7 @@ namespace core {
           return;
         }
 
+        // model::FixFieldTag::MsgType processing
         stateMachine.readField(tagBuffer, sizeof(tagBuffer), value);
         if (model::FixHelper::testTag(tagBuffer, model::FixFieldTag::MsgType))
         {

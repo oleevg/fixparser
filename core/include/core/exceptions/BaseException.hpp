@@ -13,7 +13,8 @@
 
 namespace fixparser {
 namespace core {
-
+namespace exceptions {
+    
   /**
    * @brief Applications's base exception class.
    */
@@ -28,6 +29,7 @@ namespace core {
       std::string errorMessage_;
   };
 
+}
 }
 }
 

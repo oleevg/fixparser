@@ -22,7 +22,7 @@ namespace core {
       ProtocolParser();
       ~ProtocolParser();
 
-      void run(std::istream& inputStream, char tagValueDelimiter, char fieldsDelimiter);
+      void run(std::istream& inputStream, char tagValueDelimiter = '=', char fieldsDelimiter = '^');
 
     private:
       std::unique_ptr<ProtocolParserImpl> impl_;

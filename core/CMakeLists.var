@@ -12,9 +12,9 @@ set(module_type library)
 set(library_type)
 
 set(headers
-    include/core/BaseException.hpp
+    include/core/exceptions/BaseException.hpp
+    include/core/exceptions/FixParserException.hpp
     include/core/ProtocolParser.hpp
-    ../model/include/model/FixHelper.hpp
     )
 
 set(sources

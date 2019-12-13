@@ -5,8 +5,11 @@
  *      Author: Oleg F., fedorov.ftf@gmail.com
  */
 
+#include "Application.hpp"
+
 int main(int argc, char** argv)
 {
-  return 0;
+  fixparser::cli::Application app;
+  return app.run(argc, argv);
 }
 
