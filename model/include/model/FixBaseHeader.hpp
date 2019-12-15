@@ -32,7 +32,7 @@ namespace model {
     public:
       FixBaseHeader(char messageType, size_t messageLength, const std::string& messageVersion, const RequiredTags& requiredTags);
 
-      void addField(TagType tag, const ByteArray& value);
+      bool addField(TagType tag, const ByteArray& value);
 
       std::string getMessageVersion() const;
 
@@ -48,9 +48,10 @@ namespace model {
       char messageType_;
       size_t messageLength_;
       std::string messageVersion_;
-      RequiredTags messageRequiredTags_;
 
+      RequiredTags messageRequiredTags_;
       FieldsMap fieldsMap_;
+
       log4cxx::LoggerPtr logger_;
   };
 

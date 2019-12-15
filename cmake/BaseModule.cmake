@@ -131,22 +131,9 @@ set(${project_name}_${module_name}_TESTS ${tests}
     CACHE INTERNAL "${project_name}_${module_name} tests")
 
 #
-# Add test module if tests sources are specified and skip this step overwise.
+# Add test module if tests sources are specified and skip this step otherwise.
 #
 if (${project_name}_${module_name}_TESTS)
-  set(Boost_USE_STATIC_LIBS ON)
-  set(Boost_MULTITHREADED ON)
-  if(WIN32)
-    if (MSVC)
-      set(CMAKE_CXX_FLAGS_DEBUG "/MTd")
-    endif ()
-    set(Boost_DETAILED_FAILURE_MSG ON)
-    set(Boost_USE_STATIC_RUNTIME ON)
-  endif()
-  find_package(Boost COMPONENTS unit_test_framework REQUIRED)
-
-  include_directories(${Boost_INCLUDE_DIR})
-
   set(module_test ${project_name}_${module_name}_test)
   add_executable(${module_test}
                  ${${project_name}_${module_name}_TESTS}
@@ -175,7 +162,11 @@ if (${project_name}_${module_name}_TESTS)
     endif ()
   endforeach ()
 
-  target_link_libraries(${module_test} ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY} ${CMAKE_THREAD_LIBS_INIT})
+  #target_link_libraries(${module_test} ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY} ${CMAKE_THREAD_LIBS_INIT})
+
+  foreach (dependency ${external_libraries_test})
+    target_link_libraries(${module_test} ${dependency})
+  endforeach ()
 
   add_test(NAME ${project_name}_${module_test} COMMAND ${module_test})
 else ()

@@ -11,6 +11,8 @@
 #include <iostream>
 #include <memory>
 
+#include <core/FixMessageProcessor.hpp>
+
 namespace fixparser {
 namespace core {
 
@@ -19,13 +21,14 @@ namespace core {
   class ProtocolParser
   {
     public:
-      ProtocolParser();
+      ProtocolParser(const FixMessageProcessor::Ptr& fixMessageProcessor);
       ~ProtocolParser();
 
       void run(std::istream& inputStream, char tagValueDelimiter = '=', char fieldsDelimiter = '^');
 
     private:
       std::unique_ptr<ProtocolParserImpl> impl_;
+      FixMessageProcessor::Ptr fixMessageProcessor_;
   };
 
 }

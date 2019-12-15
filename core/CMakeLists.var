@@ -15,15 +15,23 @@ set(headers
     include/core/exceptions/BaseException.hpp
     include/core/exceptions/FixParserException.hpp
     include/core/ProtocolParser.hpp
+    include/core/FixMessageProcessor.hpp
+    include/core/OrderBookItem.hpp
+    include/core/OrderBook.hpp
+    include/core/IOrderBookObserver.hpp
     )
 
 set(sources
+    src/exceptions/BaseException.cpp
     src/ProtocolParser.cpp
-    ../model/src/FixHelper.cpp
+    src/FixMessageProcessor.cpp
+    src/OrderBook.cpp
+    src/ConsoleOrderBookObserver.cpp
     )
 
 set(tests
     test/ProtocolParser_test.cpp
+    test/OrderBook_test.cpp
     )
 
 set(definitions
@@ -34,10 +42,15 @@ set(libraries
     )
 
 set(external_libraries
+    ${Log4cxx_LIBRARIES}
     )
 
 set(libraries_test
     fixparser_core
+    )
+
+set(external_libraries_test
     ${GTEST_LIBRARIES}
     ${Log4cxx_LIBRARIES}
+    ${CONAN_LIBS_BOOST}
     )

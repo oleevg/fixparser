@@ -18,57 +18,133 @@
 #include <model/FixFieldTag.hpp>
 #include <model/FixHelper.hpp>
 #include <model/TagValue.hpp>
+#include <model/FixMessageBuilder.hpp>
 
 #include <core/ProtocolParser.hpp>
+#include <core/FixMessageProcessor.hpp>
+#include <core/exceptions/FixParserException.hpp>
 
 namespace fixparser {
 namespace core {
 
+  namespace {
+
+    class FieldData
+    {
+      public:
+        FieldData()
+        {
+          tagBuffer[0] = '\0';
+        }
+
+        void clear()
+        {
+          tagBuffer[0] = '\0';
+          value.clear();
+        }
+
+        unsigned int getTag() const
+        {
+          return std::atoi(tagBuffer);
+        }
+
+        const model::ByteArray& getValue() const
+        {
+          return value;
+        }
+
+      public:
+        char tagBuffer[24];
+        model::ByteArray value;
+    };
+
+    class GroupFields
+    {
+      public:
+        void clear()
+        {
+          fieldsMap_.clear();
+        }
+
+        void addField(model::TagType tag, const model::ByteArray& value)
+        {
+          auto tagValue = std::make_shared<model::TagValue>(tag, value);
+          fieldsMap_.insert({tag, tagValue});
+        }
+
+        const model::FieldsMap& getFieldsMap() const
+        {
+          return fieldsMap_;
+        }
+
+      private:
+        model::FieldsMap fieldsMap_;
+    };
+
+  }
+
   struct ProtocolParserImpl: boost::msm::front::state_machine_def<ProtocolParserImpl>
   {
     ProtocolParserImpl(std::istream& inputStream, char tagValueDelimiter, char fieldsDelimiter):
-            inputStream_(inputStream), tagValueDelimiter_(tagValueDelimiter), fieldsDelimiter_(fieldsDelimiter)
+            inputStream_(inputStream), fieldsGroupCounter_(0), tagValueDelimiter_(tagValueDelimiter), fieldsDelimiter_(fieldsDelimiter)
     {
       logger_ = log4cxx::Logger::getLogger("fixparser.core.ProtocolParser");
     }
 
-    void readField(char* buffer, size_t size, model::ByteArray& byteArray)
+    template <class Fsm>
+    void readField(FieldData& fieldData, Fsm& stateMachine)
     {
       if(!inputStream_)
       {
         LOG4CXX_INFO(logger_, "End of the input data stream.");
+        stateMachine.process_event(EndOfStream());
       }
-
-      inputStream_.getline(buffer, size, tagValueDelimiter_);
-      LOG4CXX_DEBUG(logger_, "Found tag: " << std::string(buffer));
-
-      char symbol = 0;
-      byteArray.clear();
-      inputStream_.get(symbol);
-      while (inputStream_ && symbol != fieldsDelimiter_)
+      else
       {
-        byteArray.push_back(symbol);
-        inputStream_.get(symbol);
-      }
+        fieldData.clear();
 
-      LOG4CXX_DEBUG(logger_, "Found value: " << std::string(byteArray.begin(), byteArray.end()));
+        inputStream_.getline(fieldData.tagBuffer, sizeof(fieldData.tagBuffer), tagValueDelimiter_);
+        LOG4CXX_DEBUG(logger_, "Found tag: " << std::string(fieldData.tagBuffer));
+
+        char symbol = 0;
+        inputStream_.get(symbol);
+        while (inputStream_ && symbol != fieldsDelimiter_)
+        {
+          fieldData.value.push_back(symbol);
+          inputStream_.get(symbol);
+        }
+
+        LOG4CXX_DEBUG(logger_, "Found value: " << std::string(fieldData.getValue().begin(), fieldData.getValue().end())
+                                               << ", size: " << fieldData.getValue().size());
+      }
     }
 
     // Events
+    struct InitialEvent {};
+
     struct HeaderProcessed {};
 
-    struct FieldsGroupProcessed {};
+    struct GroupFieldsProcessed
+    {
+      FieldData fieldData;
+    };
 
-    struct FieldsGroupStarted {};
+    struct GroupFieldsStarted {};
 
     struct ControlSumRead
     {
-      model::TagValue value;
+      FieldData fieldData;
     };
 
     struct ValidMessageProcessed {};
 
     struct InvalidMessageProcessed {};
+
+    struct UnsupportedMessageFound {};
+
+    struct MessageProcessed {};
+
+    struct EndOfStream {};
 
     // States
     struct HeaderProcessing : boost::msm::front::state<>
@@ -82,14 +158,13 @@ namespace core {
         size_t messageLength = 0;
         std::string messageVersion;
 
-        char tagBuffer[24];
-        model::ByteArray value;
+        FieldData fieldData;
 
         // model::FixFieldTag::BeginString processing
-        stateMachine.readField(tagBuffer, sizeof(tagBuffer), value);
-        if(model::FixHelper::testTag(tagBuffer, model::FixFieldTag::BeginString))
+        stateMachine.readField(fieldData, stateMachine);
+        if(model::FixHelper::testTag(fieldData.getTag(), model::FixFieldTag::BeginString))
         {
-            messageVersion.assign(value.cbegin(), value.cend());
+            messageVersion.assign(fieldData.getValue().cbegin(), fieldData.getValue().cend());
         }
         else
         {
@@ -98,10 +173,10 @@ namespace core {
         }
 
         // model::FixFieldTag::BodyLength processing
-        stateMachine.readField(tagBuffer, sizeof(tagBuffer), value);
-        if (model::FixHelper::testTag(tagBuffer, model::FixFieldTag::BodyLength))
+        stateMachine.readField(fieldData, stateMachine);
+        if (model::FixHelper::testTag(fieldData.getTag(), model::FixFieldTag::BodyLength))
         {
-          messageLength = std::atoi(std::string(value.cbegin(), value.cend()).c_str());
+          messageLength = std::atoi(std::string(fieldData.getValue().cbegin(), fieldData.getValue().cend()).c_str());
         }
         else
         {
@@ -110,15 +185,15 @@ namespace core {
         }
 
         // model::FixFieldTag::MsgType processing
-        stateMachine.readField(tagBuffer, sizeof(tagBuffer), value);
-        if (model::FixHelper::testTag(tagBuffer, model::FixFieldTag::MsgType))
+        stateMachine.readField(fieldData, stateMachine);
+        if (model::FixHelper::testTag(fieldData.getTag(), model::FixFieldTag::MsgType))
         {
-          if(value.size() > 1)
+          if(fieldData.getValue().size() > 1)
           {
             LOG4CXX_ERROR(stateMachine.logger_, "Wrong length for the field FixFieldTag::MsgType.");
           }
 
-          messageType = value.front();
+          messageType = fieldData.getValue().front();
         }
         else
         {
@@ -129,51 +204,123 @@ namespace core {
         stateMachine.header_ = model::CreateFixHeader(messageType, messageLength, messageVersion);
         while (!stateMachine.header_->isValid())
         {
-          stateMachine.readField(tagBuffer, sizeof(tagBuffer), value);
-          stateMachine.header_->addField(std::atoi(tagBuffer), value);
+          stateMachine.readField(fieldData, stateMachine);
+          stateMachine.header_->addField(fieldData.getTag(), fieldData.getValue());
         }
 
-        stateMachine.message_ = std::make_shared<model::FixBaseMessage>(stateMachine.header_);
-        stateMachine.process_event(HeaderProcessed());
+        auto message = model::FixMessageBuilder().CreateMessage(stateMachine.header_);
+        if(message)
+        {
+          stateMachine.message_ = message;
+          stateMachine.process_event(HeaderProcessed());
+        }
+        else
+        {
+          stateMachine.process_event(UnsupportedMessageFound());
+        }
       }
     };
 
     struct FieldProcessing : boost::msm::front::state<>
     {
+      template <class Fsm>
+      bool processField(const FieldData& fieldData, Fsm& stateMachine) const
+      {
+        if (model::FixHelper::testTag(fieldData.getTag(), model::FixFieldTag::NoMDEntries))
+        {
+          stateMachine.fieldsGroupCounter_ = model::FixHelper::toInteger(fieldData.getValue());
+
+          stateMachine.message_->addField(fieldData.getTag(), fieldData.getValue());
+          stateMachine.process_event(GroupFieldsStarted());
+          return false;
+        }
+        else if (model::FixHelper::testTag(fieldData.getTag(), model::FixFieldTag::CheckSum))
+        {
+          ControlSumRead controlSumRead{fieldData};
+
+          stateMachine.process_event(controlSumRead);
+          return false;
+        }
+        else
+        {
+          stateMachine.message_->addField(fieldData.getTag(), fieldData.getValue());
+          return true;
+        }
+      }
+
       template<class Event, class Fsm>
-      void on_entry(Event const&, Fsm& stateMachine) const
+      void on_entry(const Event&, Fsm& stateMachine) const
       {
         LOG4CXX_DEBUG(stateMachine.logger_, "enter in " << __PRETTY_FUNCTION__);
 
-        char tagBuffer[24];
-        model::ByteArray value;
+        while(stateMachine.inputStream_)
+        {
+          FieldData fieldData;
+          stateMachine.readField(fieldData, stateMachine);
+          if(!processField(fieldData, stateMachine))
+          {
+            break;
+          }
+        }
+
+        LOG4CXX_DEBUG(stateMachine.logger_, "exit from " << __PRETTY_FUNCTION__);
+      }
+
+      template<class Fsm>
+      void on_entry(const GroupFieldsProcessed& event, Fsm& stateMachine) const
+      {
+        LOG4CXX_DEBUG(stateMachine.logger_, "enter in " << __PRETTY_FUNCTION__);
+        processField(event.fieldData, stateMachine);
 
         while(stateMachine.inputStream_)
         {
-          stateMachine.readField(tagBuffer, sizeof(tagBuffer), value);
-          if (model::FixHelper::testTag(tagBuffer, model::FixFieldTag::NoMDEntries))
+          FieldData fieldData;
+          stateMachine.readField(fieldData, stateMachine);
+          if(!processField(fieldData, stateMachine))
           {
-            stateMachine.message_->addField(std::atoi(tagBuffer), value);
-            stateMachine.process_event(FieldsGroupStarted());
+            break;
           }
-          else if (model::FixHelper::testTag(tagBuffer, model::FixFieldTag::CheckSum))
-          {
-            ControlSumRead controlSumRead{model::TagValue{static_cast<unsigned >(std::atoi(tagBuffer)), value}};
-
-            stateMachine.process_event(controlSumRead);
-          }
-
-          stateMachine.message_->addField(std::atoi(tagBuffer), value);
         }
+        LOG4CXX_DEBUG(stateMachine.logger_, "exit from " << __PRETTY_FUNCTION__);
       }
     };
 
-    struct FieldsGroupProcessing : boost::msm::front::state<>
+    struct GroupFieldsProcessing : boost::msm::front::state<>
     {
       template<class Event, class Fsm>
       void on_entry(Event const&, Fsm& stateMachine) const
       {
         LOG4CXX_DEBUG(stateMachine.logger_, "enter in " << __PRETTY_FUNCTION__);
+
+        const auto& fieldsMap = stateMachine.groupFields_.getFieldsMap();
+        const auto& message = stateMachine.message_;
+        FieldData fieldData;
+
+        for(size_t i = 0; i < stateMachine.fieldsGroupCounter_; )
+        {
+          stateMachine.readField(fieldData, stateMachine);
+
+          if(message->isGroupField(fieldData.getTag()))
+          {
+            if (fieldsMap.count(fieldData.getTag()))
+            {
+              stateMachine.message_->addGroupFields(fieldsMap);
+
+              ++i;
+              stateMachine.groupFields_.clear();
+            }
+
+            stateMachine.groupFields_.addField(fieldData.getTag(), fieldData.getValue());
+          }
+          else
+          {
+            LOG4CXX_DEBUG(stateMachine.logger_, "Not group field found: " << fieldData.getTag());
+            ++i;
+          }
+        }
+
+        GroupFieldsProcessed groupFieldsProcessed{fieldData};
+        stateMachine.process_event(groupFieldsProcessed);
       }
     };
 
@@ -183,6 +330,17 @@ namespace core {
       void on_entry(Event const&, Fsm& stateMachine) const
       {
         LOG4CXX_DEBUG(stateMachine.logger_, "enter in " << __PRETTY_FUNCTION__);
+
+        if(stateMachine.message_)
+        {
+          if(stateMachine.message_->checkControlSum())
+          {
+            stateMachine.process_event(ValidMessageProcessed());
+            return;
+          }
+        }
+
+        stateMachine.process_event(InvalidMessageProcessed());
       }
     };
 
@@ -192,19 +350,66 @@ namespace core {
       void on_entry(Event const&, Fsm& stateMachine) const
       {
         LOG4CXX_DEBUG(stateMachine.logger_, "enter in " << __PRETTY_FUNCTION__);
+
+        stateMachine.fixMessageProcessor_->processMessageAsync(stateMachine.message_);
+
+        stateMachine.message_.reset();
+        stateMachine.header_.reset();
+
+        stateMachine.process_event(MessageProcessed());
+      }
+    };
+
+    struct UnsupportedMessageProcessing : boost::msm::front::state<>
+    {
+      template<class Event, class Fsm>
+      void on_entry(Event const&, Fsm& stateMachine) const
+      {
+        LOG4CXX_DEBUG(stateMachine.logger_, "enter in " << __PRETTY_FUNCTION__);
+
+        while(stateMachine.inputStream_)
+        {
+          FieldData fieldData;
+          stateMachine.readField(fieldData, stateMachine);
+
+          if(model::FixHelper::testTag(fieldData.getTag(), model::FixFieldTag::CheckSum))
+          {
+            stateMachine.process_event(InitialEvent());
+            return;
+          }
+        }
+      }
+    };
+
+    struct EndOfStreamProcessing : boost::msm::front::state<>
+    {
+      template<class Event, class Fsm>
+      void on_entry(Event const&, Fsm& stateMachine) const
+      {
+        LOG4CXX_INFO(stateMachine.logger_, "End of input data stream detected.");
+        stateMachine.stop();
       }
     };
 
     // Set initial state
     typedef HeaderProcessing initial_state;
+    typedef InitialEvent initial_event;
 
     // Transition table
     struct transition_table : boost::mpl::vector<
             //          Start   Event   Next    Action      Guard
             boost::msm::front::Row < HeaderProcessing, HeaderProcessed, FieldProcessing, boost::msm::front::none, boost::msm::front::none>,
-            boost::msm::front::Row < FieldProcessing, FieldsGroupStarted, FieldsGroupProcessing, boost::msm::front::none, boost::msm::front::none>,
-            boost::msm::front::Row < FieldsGroupProcessing, FieldsGroupProcessed, FieldProcessing, boost::msm::front::none, boost::msm::front::none>,
-            boost::msm::front::Row < FieldProcessing, ControlSumRead, ControlSumChecking, boost::msm::front::none, boost::msm::front::none>
+            boost::msm::front::Row < FieldProcessing, GroupFieldsStarted, GroupFieldsProcessing, boost::msm::front::none, boost::msm::front::none>,
+            boost::msm::front::Row < GroupFieldsProcessing, GroupFieldsProcessed, FieldProcessing, boost::msm::front::none, boost::msm::front::none>,
+            boost::msm::front::Row < FieldProcessing, ControlSumRead, ControlSumChecking, boost::msm::front::none, boost::msm::front::none>,
+            boost::msm::front::Row < ControlSumChecking, ValidMessageProcessed, MessageProcessing, boost::msm::front::none, boost::msm::front::none>,
+            boost::msm::front::Row < ControlSumChecking, InvalidMessageProcessed, HeaderProcessing, boost::msm::front::none, boost::msm::front::none>,
+            boost::msm::front::Row < MessageProcessing, MessageProcessed, HeaderProcessing, boost::msm::front::none, boost::msm::front::none>,
+            boost::msm::front::Row < HeaderProcessing, UnsupportedMessageFound, UnsupportedMessageProcessing, boost::msm::front::none, boost::msm::front::none>,
+            boost::msm::front::Row < UnsupportedMessageProcessing, InitialEvent, HeaderProcessing, boost::msm::front::none, boost::msm::front::none>,
+            boost::msm::front::Row < HeaderProcessing, EndOfStream, EndOfStreamProcessing, boost::msm::front::none, boost::msm::front::none>,
+            boost::msm::front::Row < FieldProcessing, EndOfStream, EndOfStreamProcessing, boost::msm::front::none, boost::msm::front::none>,
+            boost::msm::front::Row < GroupFieldsProcessing, EndOfStream, EndOfStreamProcessing, boost::msm::front::none, boost::msm::front::none>
     > {};
 
     std::istream& inputStream_;
@@ -212,15 +417,14 @@ namespace core {
 
     model::FixBaseHeader::Ptr header_;
     model::FixBaseMessage::Ptr message_;
+    GroupFields groupFields_;
+    size_t fieldsGroupCounter_;
 
     char tagValueDelimiter_;
     char fieldsDelimiter_;
+
+    FixMessageProcessor::Ptr fixMessageProcessor_;
   };
-
-  ProtocolParser::ProtocolParser()
-  {
-
-  }
 
   ProtocolParser::~ProtocolParser() = default;
 
@@ -229,7 +433,14 @@ namespace core {
     typedef boost::msm::back::state_machine<ProtocolParserImpl> StateMachine;
 
     StateMachine stateMachine(std::ref(inputStream), tagValueDelimiter, fieldsDelimiter);
+    stateMachine.fixMessageProcessor_ = fixMessageProcessor_;
     stateMachine.start();
+  }
+
+  ProtocolParser::ProtocolParser(const FixMessageProcessor::Ptr& fixMessageProcessor):
+  fixMessageProcessor_(fixMessageProcessor)
+  {
+
   }
 
 }

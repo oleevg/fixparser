@@ -6,6 +6,7 @@
  */
 
 #include <stdexcept>
+#include <algorithm>
 
 #include <boost/format.hpp>
 
@@ -22,14 +23,28 @@ namespace model {
     logger_ = log4cxx::Logger::getLogger("fixparser.model");
   }
 
-  void FixBaseHeader::addField(TagType tag, const ByteArray& value)
+  bool FixBaseHeader::addField(TagType tag, const ByteArray& value)
   {
+    auto iter = std::find_if(messageRequiredTags_.cbegin(), messageRequiredTags_.cend(), [](const decltype (messageRequiredTags_)::value_type & value)
+    {
+      return static_cast<TagType>(value);
+    });
+
+    if(iter == messageRequiredTags_.cend())
+    {
+      LOG4CXX_WARN(logger_, "Attempt to add not header field with tag " << tag);
+      return false;
+    }
+
     auto tagValue = std::make_shared<model::TagValue>(tag, value);
     auto result = fieldsMap_.insert({tag, tagValue});
     if(!result.second)
     {
       LOG4CXX_WARN(logger_, "Attempt to add field with tag " << tag << " multiple time.");
+      return false;
     }
+
+    return true;
   }
 
   std::string FixBaseHeader::getMessageVersion() const
@@ -45,19 +60,6 @@ namespace model {
   size_t FixBaseHeader::getMessageLength() const
   {
     return messageLength_;
-  }
-
-  FixBaseHeader::Ptr CreateFixHeader(char messageType, size_t messageLength, const std::string& messageVersion)
-  {
-    if(messageVersion == "FIX.4.4")
-    {
-      FixBaseHeader::RequiredTags requiredTags{FixFieldTag::SenderCompID, FixFieldTag::TargetCompID};
-      return std::make_shared<FixBaseHeader>(messageType, messageLength, messageVersion, requiredTags);
-    }
-    else
-    {
-      throw std::logic_error((boost::format("Fix protocol %s is not supported.") % messageVersion).str());
-    }
   }
 
   bool FixBaseHeader::isValid()
@@ -85,6 +87,20 @@ namespace model {
 
     return result;
   }
+
+  FixBaseHeader::Ptr CreateFixHeader(char messageType, size_t messageLength, const std::string& messageVersion)
+  {
+    if(messageVersion == "FIX.4.4")
+    {
+      FixBaseHeader::RequiredTags requiredTags{FixFieldTag::SenderCompID, FixFieldTag::TargetCompID};
+      return std::make_shared<FixBaseHeader>(messageType, messageLength, messageVersion, requiredTags);
+    }
+    else
+    {
+      throw std::logic_error((boost::format("Fix protocol %s is not supported.") % messageVersion).str());
+    }
+  }
+
 }
 }
 

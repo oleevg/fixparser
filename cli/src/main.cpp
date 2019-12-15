@@ -7,7 +7,7 @@
 
 #include "Application.hpp"
 
-int main(int argc, char** argv)
+int main(int argc, const char** argv)
 {
   fixparser::cli::Application app;
   return app.run(argc, argv);

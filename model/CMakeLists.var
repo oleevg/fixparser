@@ -16,11 +16,17 @@ set(headers
     include/model/FixFieldTag.hpp
     include/model/FixBaseHeader.hpp
     include/model/FixBaseMessage.hpp
+    include/model/FixHelper.hpp
+    include/model/FixMessageBuilder.hpp
+    src/MarketDataSnapshotMessage.hpp
+    src/MarketDataIncrementalMessage.hpp
     )
 
 set(sources
     src/FixBaseHeader.cpp
     src/FixBaseMessage.cpp
+    src/FixHelper.cpp
+    src/FixMessageBuilder.cpp
     )
 
 set(tests
@@ -30,6 +36,7 @@ set(definitions
     )
 
 set(libraries
+    ${Log4cxx_LIBRARIES}
     )
 
 set(external_libraries

@@ -19,7 +19,11 @@ namespace model {
   class FixHelper
   {
     public:
-      static bool testTag(const char* tagBuffer, model::FixFieldTag tagValue);
+      static bool testTag(unsigned int tag, model::FixFieldTag tagValue);
+
+      static unsigned int toInteger(const model::ByteArray& value);
+
+      static float toFloat(const model::ByteArray& value);
 
       static unsigned int getAsciiSymbolsSum(model::FixFieldTag tag);
 

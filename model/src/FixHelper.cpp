@@ -30,9 +30,9 @@ namespace model {
 
   }
 
-  bool FixHelper::testTag(const char* tagBuffer, fixparser::model::FixFieldTag tagValue)
+  bool FixHelper::testTag(unsigned int tag, fixparser::model::FixFieldTag tagValue)
   {
-    return std::atoi(tagBuffer) == static_cast<int>(tagValue);
+    return tag == static_cast<int>(tagValue);
   }
 
   unsigned int FixHelper::getAsciiSymbolsSum(model::FixFieldTag tag)
@@ -74,6 +74,16 @@ namespace model {
   unsigned int FixHelper::getAsciiSymbolsSumValue(const std::string& tag)
   {
     return getAsciiSymbolsSumInternal(tag, '^');
+  }
+
+  unsigned int FixHelper::toInteger(const model::ByteArray& value)
+  {
+    return std::atoi(std::string(value.cbegin(), value.cend()).c_str());
+  }
+
+  float FixHelper::toFloat(const ByteArray& value)
+  {
+    return std::stof(std::string(value.cbegin(), value.cend()).c_str());
   }
 }
 }

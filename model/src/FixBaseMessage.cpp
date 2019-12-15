@@ -10,8 +10,8 @@
 namespace fixparser {
 namespace model {
 
-  FixBaseMessage::FixBaseMessage(const FixBaseHeader::Ptr& header):
-  header_(header)
+  FixBaseMessage::FixBaseMessage(const FixBaseHeader::Ptr& header, const FieldsSet& groupFields) :
+  header_(header), fieldsInGroup_(groupFields)
   {
     logger_ = log4cxx::Logger::getLogger("fixparser.model.message");
   }
@@ -26,22 +26,63 @@ namespace model {
     }
   }
 
-  void FixBaseMessage::addFieldsGroup(const FieldsMap& fieldsMap)
+  void FixBaseMessage::addGroupFields(const FieldsMap& fieldsMap)
   {
-    fieldsGroupCollection_.push_back(fieldsMap);
+    groupFieldsCollection_.push_back(fieldsMap);
   }
 
   bool FixBaseMessage::checkControlSum()
   {
-    if(controlSumCheckState_ != ControlSumCheckState::NotChecked)
-    {
-      return controlSumCheckState_ == ControlSumCheckState::Valid;
-    }
+//    if(controlSumCheckState_ != ControlSumCheckState::NotChecked)
+//    {
+//      return controlSumCheckState_ == ControlSumCheckState::Valid;
+//    }
+//
+//    size_t fieldsSum = 0;
+//    fieldsSum += header_->getFieldsSum();
 
-    size_t fieldsSum = 0;
-    fieldsSum += header_->getFieldsSum();
+    return true;
 
   }
+
+  bool FixBaseMessage::isGroupField(TagType tag) const
+  {
+    return fieldsInGroup_.count(tag);
+  }
+
+  FixMessageType FixBaseMessage::getMessageType() const
+  {
+    return static_cast<FixMessageType>(header_->getMessageType());
+  }
+
+  TagValue::Ptr FixBaseMessage::getField(TagType tag) const
+  {
+    TagValue::Ptr result = nullptr;
+
+    auto field = fieldsMap_.find(tag);
+    if(field != fieldsMap_.end())
+    {
+      result = field->second;
+    }
+
+    return result;
+  }
+
+  size_t FixBaseMessage::getGroupFieldsSize() const
+  {
+    return groupFieldsCollection_.size();
+  }
+
+  const FieldsMap& FixBaseMessage::getGroupFields(size_t index) const
+  {
+    if(index >= getGroupFieldsSize())
+    {
+      throw std::out_of_range("Requested index is out of destination size");
+    }
+
+    return groupFieldsCollection_[index];
+  }
+
 }
 }
 

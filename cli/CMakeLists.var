@@ -12,10 +12,12 @@ set(module_type executable)
 set(library_type)
 
 set(headers
+    src/Application.hpp
     )
 
 set(sources
     src/main.cpp
+    src/Application.cpp
     )
 
 set(tests
@@ -23,7 +25,6 @@ set(tests
 
 set(definitions
     )
-
 
 set(libraries
     fixparser_core
@@ -36,7 +37,7 @@ set(libraries_UNIX
 set(external_libraries
     ${Boost_SYSTEM_LIBRARY}
     ${Boost_PROGRAM_OPTIONS_LIBRARY}
-    ${Boost_SERIALIZATION_LIBRARY}
+    ${CONAN_LIBS_BOOST}
     )
 
 set(libraries_test
