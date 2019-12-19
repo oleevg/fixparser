@@ -24,6 +24,10 @@
 #include <core/FixMessageProcessor.hpp>
 #include <core/exceptions/FixParserException.hpp>
 
+#define READ_OR_RETURN_ON_ENDOF_STREAM(stateMachine, fieldData) \
+{ bool endOfStream = !stateMachine.readField(fieldData, stateMachine); \
+if(endOfStream) { stateMachine.process_event(EndOfStream()); return; } }
+
 namespace fixparser {
 namespace core {
 
@@ -91,13 +95,31 @@ namespace core {
       logger_ = log4cxx::Logger::getLogger("fixparser.core.ProtocolParser");
     }
 
-    template <class Fsm>
-    void readField(FieldData& fieldData, Fsm& stateMachine)
+    bool isStreamValid() const
     {
-      if(!inputStream_)
+      bool result = true;
+
+      if(inputStream_.eof())
       {
         LOG4CXX_INFO(logger_, "End of the input data stream.");
-        stateMachine.process_event(EndOfStream());
+        result = false;
+      }
+      else if(!inputStream_)
+      {
+        throw core::exceptions::BaseException("Input data stream is in an error state.");
+      }
+
+      return result;
+    }
+
+    template <class Fsm>
+    bool readField(FieldData& fieldData, Fsm& stateMachine)
+    {
+      bool result = isStreamValid();
+
+      if(!result)
+      {
+        return result;
       }
       else
       {
@@ -107,16 +129,22 @@ namespace core {
         LOG4CXX_DEBUG(logger_, "Found tag: " << std::string(fieldData.tagBuffer));
 
         char symbol = 0;
-        inputStream_.get(symbol);
-        while (inputStream_ && symbol != fieldsDelimiter_)
+        result = isStreamValid();
+        if(result)
         {
-          fieldData.value.push_back(symbol);
           inputStream_.get(symbol);
-        }
+          while ((result = isStreamValid()) && symbol != fieldsDelimiter_)
+          {
+            fieldData.value.push_back(symbol);
+            inputStream_.get(symbol);
+          }
 
-        LOG4CXX_DEBUG(logger_, "Found value: " << std::string(fieldData.getValue().begin(), fieldData.getValue().end())
-                                               << ", size: " << fieldData.getValue().size());
+          LOG4CXX_DEBUG(logger_, "Found value: " << std::string(fieldData.getValue().begin(), fieldData.getValue().end())
+                                                 << ", size: " << fieldData.getValue().size());
+        }
       }
+
+      return result;
     }
 
     // Events
@@ -161,7 +189,8 @@ namespace core {
         FieldData fieldData;
 
         // model::FixFieldTag::BeginString processing
-        stateMachine.readField(fieldData, stateMachine);
+        READ_OR_RETURN_ON_ENDOF_STREAM(stateMachine, fieldData);
+
         if(model::FixHelper::testTag(fieldData.getTag(), model::FixFieldTag::BeginString))
         {
             messageVersion.assign(fieldData.getValue().cbegin(), fieldData.getValue().cend());
@@ -173,7 +202,8 @@ namespace core {
         }
 
         // model::FixFieldTag::BodyLength processing
-        stateMachine.readField(fieldData, stateMachine);
+        READ_OR_RETURN_ON_ENDOF_STREAM(stateMachine, fieldData);
+
         if (model::FixHelper::testTag(fieldData.getTag(), model::FixFieldTag::BodyLength))
         {
           messageLength = std::atoi(std::string(fieldData.getValue().cbegin(), fieldData.getValue().cend()).c_str());
@@ -185,7 +215,8 @@ namespace core {
         }
 
         // model::FixFieldTag::MsgType processing
-        stateMachine.readField(fieldData, stateMachine);
+        READ_OR_RETURN_ON_ENDOF_STREAM(stateMachine, fieldData);
+
         if (model::FixHelper::testTag(fieldData.getTag(), model::FixFieldTag::MsgType))
         {
           if(fieldData.getValue().size() > 1)
@@ -204,7 +235,7 @@ namespace core {
         stateMachine.header_ = model::CreateFixHeader(messageType, messageLength, messageVersion);
         while (!stateMachine.header_->isValid())
         {
-          stateMachine.readField(fieldData, stateMachine);
+          READ_OR_RETURN_ON_ENDOF_STREAM(stateMachine, fieldData);
           stateMachine.header_->addField(fieldData.getTag(), fieldData.getValue());
         }
 
@@ -248,12 +279,12 @@ namespace core {
         }
       }
 
-      template<class Event, class Fsm>
-      void on_entry(const Event&, Fsm& stateMachine) const
+      template<class Fsm>
+      void on_entry(const HeaderProcessed&, Fsm& stateMachine) const
       {
         LOG4CXX_DEBUG(stateMachine.logger_, "enter in " << __PRETTY_FUNCTION__);
 
-        while(stateMachine.inputStream_)
+        while(stateMachine.isStreamValid())
         {
           FieldData fieldData;
           stateMachine.readField(fieldData, stateMachine);
@@ -272,7 +303,7 @@ namespace core {
         LOG4CXX_DEBUG(stateMachine.logger_, "enter in " << __PRETTY_FUNCTION__);
         processField(event.fieldData, stateMachine);
 
-        while(stateMachine.inputStream_)
+        while(stateMachine.isStreamValid())
         {
           FieldData fieldData;
           stateMachine.readField(fieldData, stateMachine);
@@ -298,7 +329,7 @@ namespace core {
 
         for(size_t i = 0; i < stateMachine.fieldsGroupCounter_; )
         {
-          stateMachine.readField(fieldData, stateMachine);
+          READ_OR_RETURN_ON_ENDOF_STREAM(stateMachine, fieldData);
 
           if(message->isGroupField(fieldData.getTag()))
           {
@@ -367,7 +398,7 @@ namespace core {
       {
         LOG4CXX_DEBUG(stateMachine.logger_, "enter in " << __PRETTY_FUNCTION__);
 
-        while(stateMachine.inputStream_)
+        while(stateMachine.isStreamValid())
         {
           FieldData fieldData;
           stateMachine.readField(fieldData, stateMachine);
