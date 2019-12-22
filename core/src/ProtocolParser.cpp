@@ -147,10 +147,19 @@ namespace core {
       return result;
     }
 
+    void sendGroupFields()
+    {
+      message_->addGroupFields(groupFields_.getFieldsMap());
+      groupFields_.clear();
+    }
+
     // Events
     struct InitialEvent {};
 
-    struct HeaderProcessed {};
+    struct HeaderProcessed
+    {
+      FieldData fieldData;
+    };
 
     struct GroupFieldsProcessed
     {
@@ -243,7 +252,9 @@ namespace core {
         if(message)
         {
           stateMachine.message_ = message;
-          stateMachine.process_event(HeaderProcessed());
+
+          READ_OR_RETURN_ON_ENDOF_STREAM(stateMachine, fieldData);
+          stateMachine.process_event(HeaderProcessed{fieldData});
         }
         else
         {
@@ -254,65 +265,36 @@ namespace core {
 
     struct FieldProcessing : boost::msm::front::state<>
     {
-      template <class Fsm>
-      bool processField(const FieldData& fieldData, Fsm& stateMachine) const
-      {
-        if (model::FixHelper::testTag(fieldData.getTag(), model::FixFieldTag::NoMDEntries))
-        {
-          stateMachine.fieldsGroupCounter_ = model::FixHelper::toInteger(fieldData.getValue());
-
-          stateMachine.message_->addField(fieldData.getTag(), fieldData.getValue());
-          stateMachine.process_event(GroupFieldsStarted());
-          return false;
-        }
-        else if (model::FixHelper::testTag(fieldData.getTag(), model::FixFieldTag::CheckSum))
-        {
-          ControlSumRead controlSumRead{fieldData};
-
-          stateMachine.process_event(controlSumRead);
-          return false;
-        }
-        else
-        {
-          stateMachine.message_->addField(fieldData.getTag(), fieldData.getValue());
-          return true;
-        }
-      }
-
-      template<class Fsm>
-      void on_entry(const HeaderProcessed&, Fsm& stateMachine) const
+      template<class Event, class Fsm>
+      void on_entry(const Event& event, Fsm& stateMachine) const
       {
         LOG4CXX_DEBUG(stateMachine.logger_, "enter in " << __PRETTY_FUNCTION__);
 
-        while(stateMachine.isStreamValid())
+        FieldData fieldData{event.fieldData};
+        do
         {
-          FieldData fieldData;
-          stateMachine.readField(fieldData, stateMachine);
-          if(!processField(fieldData, stateMachine))
+          if (model::FixHelper::testTag(fieldData.getTag(), model::FixFieldTag::NoMDEntries))
           {
+            stateMachine.fieldsGroupCounter_ = model::FixHelper::toInteger(fieldData.getValue());
+
+            stateMachine.message_->addField(fieldData.getTag(), fieldData.getValue());
+            stateMachine.process_event(GroupFieldsStarted());
             break;
           }
-        }
-
-        LOG4CXX_DEBUG(stateMachine.logger_, "exit from " << __PRETTY_FUNCTION__);
-      }
-
-      template<class Fsm>
-      void on_entry(const GroupFieldsProcessed& event, Fsm& stateMachine) const
-      {
-        LOG4CXX_DEBUG(stateMachine.logger_, "enter in " << __PRETTY_FUNCTION__);
-        processField(event.fieldData, stateMachine);
-
-        while(stateMachine.isStreamValid())
-        {
-          FieldData fieldData;
-          stateMachine.readField(fieldData, stateMachine);
-          if(!processField(fieldData, stateMachine))
+          else if (model::FixHelper::testTag(fieldData.getTag(), model::FixFieldTag::CheckSum))
           {
+            ControlSumRead controlSumRead{fieldData};
+
+            stateMachine.process_event(controlSumRead);
             break;
           }
-        }
-        LOG4CXX_DEBUG(stateMachine.logger_, "exit from " << __PRETTY_FUNCTION__);
+          else
+          {
+            stateMachine.message_->addField(fieldData.getTag(), fieldData.getValue());
+          }
+
+          READ_OR_RETURN_ON_ENDOF_STREAM(stateMachine, fieldData);
+        } while(stateMachine.isStreamValid());
       }
     };
 
@@ -323,22 +305,22 @@ namespace core {
       {
         LOG4CXX_DEBUG(stateMachine.logger_, "enter in " << __PRETTY_FUNCTION__);
 
-        const auto& fieldsMap = stateMachine.groupFields_.getFieldsMap();
-        const auto& message = stateMachine.message_;
         FieldData fieldData;
 
         for(size_t i = 0; i < stateMachine.fieldsGroupCounter_; )
         {
           READ_OR_RETURN_ON_ENDOF_STREAM(stateMachine, fieldData);
 
+          const auto& message = stateMachine.message_;
+          const auto& fieldsMap = stateMachine.groupFields_.getFieldsMap();
           if(message->isGroupField(fieldData.getTag()))
           {
             if (fieldsMap.count(fieldData.getTag()))
             {
-              stateMachine.message_->addGroupFields(fieldsMap);
+              LOG4CXX_WARN(stateMachine.logger_, "Group field " << fieldData.getTag() << " already present.");
+              stateMachine.sendGroupFields();
 
               ++i;
-              stateMachine.groupFields_.clear();
             }
 
             stateMachine.groupFields_.addField(fieldData.getTag(), fieldData.getValue());
@@ -346,12 +328,13 @@ namespace core {
           else
           {
             LOG4CXX_DEBUG(stateMachine.logger_, "Not group field found: " << fieldData.getTag());
+            stateMachine.sendGroupFields();
+
             ++i;
           }
         }
 
-        GroupFieldsProcessed groupFieldsProcessed{fieldData};
-        stateMachine.process_event(groupFieldsProcessed);
+        stateMachine.process_event(GroupFieldsProcessed{fieldData});
       }
     };
 

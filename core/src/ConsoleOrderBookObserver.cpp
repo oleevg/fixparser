@@ -34,24 +34,28 @@ namespace core {
       {
         LOG4CXX_DEBUG(logger_, "Notification received.");
 
-        std::cout << "[Order book state]" << std::endl;
+        std::cout << "======== Order book state =========" << std::endl;
 
-        std::cout << " Total SELL: " << orderBookItemsSize_ << std::endl;
+        std::cout << std::endl << "Total SELL: " << orderBookItemsSize_ << std::endl;
         auto items = orderBook_->getNthLowestSelling(orderBookItemsSize_);
 
+        std::cout << std::endl;
         auto counter = items.size();
         for (auto iter = items.crbegin(); iter != items.crend(); ++iter)
         {
           std::cout << "[" << counter-- << "]: " << *iter << std::endl;
         }
 
+        std::cout << "==================================" << std::endl;
+
         items = orderBook_->getNthHighestBuying(orderBookItemsSize_);
-        counter = items.size();
+        counter = 0;
         for (const auto& item: items)
         {
-          std::cout << "[" << counter-- << "]: " << item << std::endl;
+          std::cout << "[" << counter++ << "]: " << item << std::endl;
         }
-        std::cout << " Total BUY: " << orderBookItemsSize_ << std::endl;
+        std::cout << "Total BUY: " << orderBookItemsSize_ << std::endl;
+        std::cout << std::endl;
       }
 
     private:

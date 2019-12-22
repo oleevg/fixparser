@@ -42,13 +42,12 @@ namespace core {
 
       bool addItem(OrderBookItemType type, const OrderBookItem& item)
       {
-        OrderBookItems* items = &buyItems;
-        OrderBookItemsComparator* comparator = &buyItemsComparator;
+        OrderBookItems* items = nullptr;
+        OrderBookItemsComparator* comparator = nullptr;
 
-        if(type == OrderBookItemType::Sell)
+        if(!fillOrderBookItemTypeSpecifics(type, items, comparator))
         {
-          items = &sellItems;
-          comparator = &sellItemsComparator;
+          return false;
         }
 
         auto iter = std::upper_bound(items->cbegin(), items->cend(), item, *comparator);
@@ -64,10 +63,9 @@ namespace core {
         OrderBookItems* items = &buyItems;
         OrderBookItemsComparator* comparator = &buyItemsComparator;
 
-        if (type == OrderBookItemType::Sell)
+        if(!fillOrderBookItemTypeSpecifics(type, items, comparator))
         {
-          items = &sellItems;
-          comparator = &sellItemsComparator;
+          return false;
         }
 
         auto iter = findItem(*items, *comparator, item);
@@ -89,13 +87,12 @@ namespace core {
       {
         bool result = true;
 
-        OrderBookItems* items = &buyItems;
-        OrderBookItemsComparator* comparator = &buyItemsComparator;
+        OrderBookItems* items = nullptr;
+        OrderBookItemsComparator* comparator = nullptr;
 
-        if (type == OrderBookItemType::Sell)
+        if(!fillOrderBookItemTypeSpecifics(type, items, comparator))
         {
-          items = &sellItems;
-          comparator = &sellItemsComparator;
+          return false;
         }
 
         auto iter = findItem(*items, *comparator, item);
@@ -110,7 +107,7 @@ namespace core {
           result = false;
         }
 
-        return true;
+        return result;
       }
 
       OrderBookItems getNthLowestSelling(size_t itemsCount) const
@@ -128,6 +125,27 @@ namespace core {
       }
 
     private:
+      bool fillOrderBookItemTypeSpecifics(OrderBookItemType type, OrderBookItems*& items, OrderBookItemsComparator*& comparator)
+      {
+        if(type == OrderBookItemType::Sell)
+        {
+          items = &sellItems;
+          comparator = &sellItemsComparator;
+        }
+        else if(type == OrderBookItemType::Buy)
+        {
+          items = &buyItems;
+          comparator = &buyItemsComparator;
+        }
+        else
+        {
+          LOG4CXX_WARN(logger, "Order book item type " << static_cast<int>(type) << " is not supported.");
+          return false;
+        }
+
+        return true;
+      }
+
       OrderBookItems::iterator findItem(OrderBookItems& items, OrderBookItemsComparator& comparator, const OrderBookItem& item)
       {
         auto iters = std::equal_range(items.begin(), items.end(), item, comparator);

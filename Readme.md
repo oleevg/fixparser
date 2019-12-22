@@ -4,13 +4,16 @@ Simple FIX protocol parser.
 
 ### Description
 
-To be done
+The parser for now supports only the two types of messages: 
+- Market Data Snapshot/Full Refresh(W)
+- Market Data Incremental Refresh(x)
+See https://docs.deribit.com/v2/#fix-api for detailed information.
 
-### Important information
-
-*Project status - in development.* 
-
-CLI is not fully functioning. FIX parser supports only a few messages and is not fully working.   
+The parser project provides CLI utility that takes text file with FIX protocol messages as an input. 
+CLI features:
+- processes FIX messages and builds Stock Exchange Order Book
+- updates build Order Book after each processed message
+- outputs to stdout the first 'N' (provided through CLI arguments) sell and buy items after each Order Book update    
 
 ### Prerequisites
 

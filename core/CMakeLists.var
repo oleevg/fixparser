@@ -42,7 +42,9 @@ set(libraries
     )
 
 set(external_libraries
-    ${Log4cxx_LIBRARIES}
+    ${CONAN_LIBS_APACHE-LOG4CXX}
+    ${CONAN_LIBS_APACHE-APR}
+    ${CONAN_LIBS_APACHE-APR-UTIL}
     )
 
 set(libraries_test
@@ -50,7 +52,6 @@ set(libraries_test
     )
 
 set(external_libraries_test
-    ${GTEST_LIBRARIES}
-    ${Log4cxx_LIBRARIES}
+    ${CONAN_LIBS_GTEST}
     ${CONAN_LIBS_BOOST}
     )

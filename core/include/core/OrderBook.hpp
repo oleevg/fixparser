@@ -21,7 +21,9 @@ namespace core {
   enum class OrderBookItemType
   {
       Buy = 0,
-      Sell = 1
+      Sell = 1,
+      Trade = 2,
+      Unknown = 0x0FFFFFFF
   };
 
   typedef std::vector<OrderBookItem> OrderBookItems;

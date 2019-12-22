@@ -26,33 +26,3 @@ conan_basic_setup()
 
 set(Boost_USE_STATIC_LIBS ON)
 set(Boost_MULTITHREADED ON)
-
-# GTest library
-if("${GTEST_LIBRARIES}" STREQUAL "")
-  set(GTEST_LIBRARIES ${CONAN_LIBS_GTEST})
-endif()
-
-# LOG4CXX library
-if("${Log4cxx_LIBRARIES}" STREQUAL "")
-  set(Log4cxx_LIBRARIES ${CONAN_LIBS_APACHE-LOG4CXX})
-  list(APPEND Log4cxx_LIBRARIES
-      ${CONAN_LIBS_APACHE-APR})
-  list(APPEND Log4cxx_LIBRARIES
-       ${CONAN_LIBS_APACHE-APR-UTIL})
-endif()
-
-# Boost library
-if("${Boost_PROGRAM_OPTIONS_LIBRARY}" STREQUAL "")
-  set(Boost_PROGRAM_OPTIONS_LIBRARY ${CONAN_LIBS_BOOST_PROGRAM_OPTIONS})
-endif()
-
-if("${Boost_SYSTEM_LIBRARY}" STREQUAL "")
-  set(Boost_SYSTEM_LIBRARY ${CONAN_LIBS_BOOST_SYSTEM})
-endif()
-
-message(STATUS "----------------------------------------------------------------------------------")
-get_cmake_property(_variableNames VARIABLES)
-foreach (_variableName ${_variableNames})
-  message(STATUS "${_variableName}='${${_variableName}}'")
-endforeach()
-message(STATUS "----------------------------------------------------------------------------------")

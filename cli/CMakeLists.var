@@ -35,8 +35,9 @@ set(libraries_UNIX
     )
 
 set(external_libraries
-    ${Boost_SYSTEM_LIBRARY}
-    ${Boost_PROGRAM_OPTIONS_LIBRARY}
+    ${CONAN_LIBS_APACHE-LOG4CXX}
+    ${CONAN_LIBS_APACHE-APR}
+    ${CONAN_LIBS_APACHE-APR-UTIL}
     ${CONAN_LIBS_BOOST}
     )
 

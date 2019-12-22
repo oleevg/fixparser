@@ -38,7 +38,7 @@ namespace core {
 
         processingThread = std::thread([this]()
         {
-          LOG4CXX_INFO(logger, "Fix messages processing thread started.");
+          LOG4CXX_INFO(logger, "FIX messages processing thread started.");
 
           while(!processingThreadExit)
           {
@@ -60,7 +60,7 @@ namespace core {
             processMessage(message);
           }
 
-          LOG4CXX_INFO(logger, "Fix messages processing thread finished.");
+          LOG4CXX_INFO(logger, "FIX messages processing thread finished.");
         });
       }
 
@@ -105,38 +105,50 @@ namespace core {
 
       OrderBookItemType convertToOrderBookItemType(unsigned int value)
       {
-        if (value == static_cast<unsigned int>(OrderBookItemType::Buy))
+        static struct
         {
-          return OrderBookItemType::Buy;
-        }
-        else if(value == static_cast<unsigned int>(OrderBookItemType::Sell))
+          int value;
+          OrderBookItemType itemTypeValue;
+        } conversions[]
         {
-          return OrderBookItemType::Sell;
-        }
-        else
+                {0, OrderBookItemType::Buy},
+                {1, OrderBookItemType::Sell},
+                {2, OrderBookItemType::Trade}
+        };
+
+        for (const auto& conv : conversions)
         {
-          throw core::exceptions::BaseException((boost::format("Unsupported entry type found: %d") % value).str());
+          if(value == conv.value)
+          {
+            return conv.itemTypeValue;
+          }
         }
+
+        return OrderBookItemType::Unknown;
       }
 
       model::MarketDataUpdateAction convertToMarketDataUpdateAction(unsigned int value)
       {
-        if (value == static_cast<unsigned int>(model::MarketDataUpdateAction::Change))
+        static struct
         {
-          return model::MarketDataUpdateAction::Change;
-        }
-        else if(value == static_cast<unsigned int>(model::MarketDataUpdateAction::Delete))
+          int value;
+          model::MarketDataUpdateAction updateAction;
+        } conversions []
         {
-          return model::MarketDataUpdateAction::Delete;
-        }
-        else if(value == static_cast<unsigned int>(model::MarketDataUpdateAction::New))
+                {0, model::MarketDataUpdateAction::New},
+                {1, model::MarketDataUpdateAction::Change},
+                {2, model::MarketDataUpdateAction::Delete}
+        };
+
+        for (const auto& conv : conversions)
         {
-          return model::MarketDataUpdateAction::New;
+          if(value == conv.value)
+          {
+            return conv.updateAction;
+          }
         }
-        else
-        {
-          throw core::exceptions::BaseException((boost::format("Unsupported update action type found: %d") % value).str());
-        }
+
+        throw core::exceptions::BaseException((boost::format("Unsupported update action type found: %d") % value).str());
       }
 
       void processMessage(const model::FixBaseMessage::Ptr& message)
