@@ -231,6 +231,7 @@ namespace core {
           if(fieldData.getValue().size() > 1)
           {
             LOG4CXX_ERROR(stateMachine.logger_, "Wrong length for the field FixFieldTag::MsgType.");
+            return;
           }
 
           messageType = fieldData.getValue().front();
@@ -317,7 +318,7 @@ namespace core {
           {
             if (fieldsMap.count(fieldData.getTag()))
             {
-              LOG4CXX_WARN(stateMachine.logger_, "Group field " << fieldData.getTag() << " already present.");
+              LOG4CXX_DEBUG(stateMachine.logger_, "Group field " << fieldData.getTag() << " already present.");
               stateMachine.sendGroupFields();
 
               ++i;
@@ -384,7 +385,7 @@ namespace core {
         while(stateMachine.isStreamValid())
         {
           FieldData fieldData;
-          stateMachine.readField(fieldData, stateMachine);
+          READ_OR_RETURN_ON_ENDOF_STREAM(stateMachine, fieldData);
 
           if(model::FixHelper::testTag(fieldData.getTag(), model::FixFieldTag::CheckSum))
           {
@@ -423,7 +424,8 @@ namespace core {
             boost::msm::front::Row < UnsupportedMessageProcessing, InitialEvent, HeaderProcessing, boost::msm::front::none, boost::msm::front::none>,
             boost::msm::front::Row < HeaderProcessing, EndOfStream, EndOfStreamProcessing, boost::msm::front::none, boost::msm::front::none>,
             boost::msm::front::Row < FieldProcessing, EndOfStream, EndOfStreamProcessing, boost::msm::front::none, boost::msm::front::none>,
-            boost::msm::front::Row < GroupFieldsProcessing, EndOfStream, EndOfStreamProcessing, boost::msm::front::none, boost::msm::front::none>
+            boost::msm::front::Row < GroupFieldsProcessing, EndOfStream, EndOfStreamProcessing, boost::msm::front::none, boost::msm::front::none>,
+            boost::msm::front::Row < UnsupportedMessageProcessing, EndOfStream, EndOfStreamProcessing, boost::msm::front::none, boost::msm::front::none>
     > {};
 
     std::istream& inputStream_;

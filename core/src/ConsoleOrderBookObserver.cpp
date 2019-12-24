@@ -19,6 +19,8 @@ namespace core {
   std::ostream& operator << (std::ostream& stream, const OrderBookItem& orderBookItem)
   {
     stream << "price: " << orderBookItem.price << " (" << orderBookItem.quantity << ")" << std::endl;
+
+    return stream;
   }
 
   class ConsoleOrderBookObserver : public IOrderBookObserver
@@ -43,7 +45,7 @@ namespace core {
         auto counter = items.size();
         for (auto iter = items.crbegin(); iter != items.crend(); ++iter)
         {
-          std::cout << "[" << counter-- << "]: " << *iter << std::endl;
+          std::cout << "[" << --counter << "]: " << *iter << std::endl;
         }
 
         std::cout << "==================================" << std::endl;

@@ -13,7 +13,7 @@ namespace model {
   FixBaseMessage::FixBaseMessage(const FixBaseHeader::Ptr& header, const FieldsSet& groupFields) :
   header_(header), fieldsInGroup_(groupFields)
   {
-    logger_ = log4cxx::Logger::getLogger("fixparser.model.message");
+    logger_ = log4cxx::Logger::getLogger("fixparser.model.FixBaseMessage");
   }
 
   void FixBaseMessage::addField(TagType tag, const ByteArray& value)
