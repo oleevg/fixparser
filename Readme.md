@@ -7,6 +7,7 @@ Simple FIX protocol parser.
 The parser for now supports only the two types of messages: 
 - Market Data Snapshot/Full Refresh(W)
 - Market Data Incremental Refresh(x)
+
 See https://docs.deribit.com/v2/#fix-api for detailed information.
 
 The parser project provides CLI utility that takes text file with FIX protocol messages as an input. 
